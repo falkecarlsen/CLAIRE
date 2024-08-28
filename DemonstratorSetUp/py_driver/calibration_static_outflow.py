@@ -37,11 +37,13 @@ def calibration():
         f.write("Tube,isInflow,duration[s],difference[mm],rate[mm/s],duty\n")
         # Switch between tube 1 and tube 2 to let the solenoids cool down a bit.
         start_time = time()
-        for duty_level in range(200):
-            claire.state.make_outdated()
-            state = claire.get_state()
-            f.write(f"{time() - start_time},{state['Tube0_water_mm']},{state['Tube1_water_mm']}\n")
+        for iteration in range(400):
+            print(f"Iteration: {iteration}")
+            claire.state.make_dynamic()
+            state = claire.update_state()
+            f.write(f"{time() - start_time},{state.tube1_level},{state.tube2_level}\n")
 
+    print("Finished.")
     claire.close()
 
 

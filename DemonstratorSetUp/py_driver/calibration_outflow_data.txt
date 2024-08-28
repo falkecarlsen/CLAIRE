@@ -1,0 +1,2 @@
+Tube,isInflow,duration[s],difference[mm],rate[mm/s],duty
+1.2687480449676514,403.0,405.0

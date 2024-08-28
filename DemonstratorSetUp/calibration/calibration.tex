@@ -167,7 +167,7 @@
 	\end{itemize}
 \end{frame}
 
-\begin{frame}{Experimental results - static outflow}
+\begin{frame}{Experimental results - static outflow July 25}
 	\centering
 	\begin{tikzpicture}
 		% To plot figure with multiple ordinates, see section 4.9.11 of the pgfplot manual.
@@ -214,6 +214,58 @@
 			color=red,
 			]
 			table[x index = 0,y index = 2, col sep=comma]{data/calibration_outflow_data.txt};
+			\addlegendentry{Tube 2}
+		\end{axis}
+	\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Experimental results - static outflow August 28}
+	\centering
+	\begin{tikzpicture}
+		% To plot figure with multiple ordinates, see section 4.9.11 of the pgfplot manual.
+		pgfplotsset{set layers}
+		\begin{axis}[
+			scale only axis,
+			xlabel={Time [s]},
+			ylabel={Level [mm]},
+			xmin=0, xmax=700,
+			ymin=350, ymax=500,
+			axis y line*=left,  %'*' avoids arrow heads
+			axis x line*=bottom, %'*' avoids arrow heads
+			width=12cm,
+			height=5cm,
+			%			xtick distance=360,
+			xmajorgrids=true,
+			ymajorgrids=true,
+			grid style=dashed,
+			yticklabel style={
+				/pgf/number format/precision=0,
+				/pgf/number format/fixed,
+				/pgf/number format/fixed zerofill,
+			},
+			legend style={
+				at={(0.5,0.1)},
+				anchor=south},
+			nodes={scale=1, transform shape}
+			]	
+			
+			
+			\addplot[
+			%			only marks,
+			%			mark size=2pt,
+			%			mark=x,
+			color=blue,
+			]
+			table[x index = 0,y expr=900 - \thisrowno{1}, col sep=comma]{data/calibration_outflow_data_2024-08-28.txt};
+			\addlegendentry{Tube 1}
+			
+			\addplot[
+			%			only marks,
+			%			mark size=2pt,
+			%			mark=x,
+			color=red,
+			]
+			table[x index = 0,y expr=900 - \thisrowno{2}, col sep=comma]{data/calibration_outflow_data_2024-08-28.txt};
 			\addlegendentry{Tube 2}
 		\end{axis}
 	\end{tikzpicture}
