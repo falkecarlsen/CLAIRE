@@ -20,7 +20,7 @@ from time import time
 # Insert the name of the usb port, which might be different for different devices.
 # An easy way to get the port name is to use the Arduino IDE.
 # PORT = '/dev/ttyUSB0'
-PORT = '/dev/cu.usbserial-1420'
+PORT = '/dev/cu.usbmodem14201'
 
 # File to write calibration data to
 data_file = "calibration_outflow_data.txt"
