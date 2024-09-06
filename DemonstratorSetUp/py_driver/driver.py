@@ -124,6 +124,14 @@ class ClaireState:
     def tube2_level(self) -> Optional[float]:
         return self.convert_distance_to_level(self.Tube2_sonar_dist_mm)
 
+    def get_tube_level(self, tube):
+        if tube == 1:
+            return self.tube1_level
+        if tube == 2:
+            return self.tube2_level
+        else:
+            raise RuntimeError(f"Unexpected tube number {tube}.")
+
 
 class ClaireDevice:
     """
@@ -236,34 +244,27 @@ class ClaireDevice:
         """
         TAG = "UNDERFLOW_CHECK"
         while True:
-            if not self.ready():
-                # do liveness check and update state if device is outdated but was ready on last communication
-                if self.outdated():
-                    print(f"Device is outdated. {self.state.last_update=}, {datetime.now()=}")
-                    # if last line is OK, then device is still alive, do update of state
-                    if self.read_buffer and self.read_buffer[-1] == CLAIRE_READY_SIGNAL:
-                        print(f"Device is alive. {self.state.last_update=}, {datetime.now()=}")
-                        self.busy = False
-                        self.update_state(quick=True)
-            else:
-                if DEBUG:
-                    print(f'{TAG}: Device is not ready. Waiting {UNDERFLOW_CHECK_INTERVAL} seconds.')
-                    sleep(UNDERFLOW_CHECK_INTERVAL)
-                continue
+            # if state is stale or dynamic, update is required
+            if self.state.dynamic or self.state.last_update < datetime.now() - timedelta(COMMUNICATION_TIMEOUT):
+                print(f"{TAG} State is stale or dynamic, requiring fresh state. {self.state.last_update=}, {datetime.now()=}")
 
-            # update state if device is dynamic
-            if self.state.dynamic:
+                # if not ready, delay and try again
+                if not self.ready():
+                    sleep(1)
+                    continue
+
+                # do quick update
                 self.update_state(quick=True)
 
             # check underflows
-            if self.state.Tube1_sonar_dist_mm < TUBE_MAX_LEVEL:
+            if self.state.Tube1_sonar_dist_mm > TUBE_MAX_LEVEL:
                 # if outflow is active while inflow is stopped, error out
                 if self.state.Tube1_outflow_duty > 0 and self.state.Tube1_inflow_duty == 0:
                     self.set_outflow(1, 0)
                     print(
                         f'{TAG}: WARN: Low water level detected in tube 1: {self.state.Tube1_sonar_dist_mm}. Stopped outflow')
 
-            elif self.state.Tube2_sonar_dist_mm < TUBE_MAX_LEVEL:
+            elif self.state.Tube2_sonar_dist_mm > TUBE_MAX_LEVEL:
                 # if outflow is active while inflow is stopped, error out
                 if self.state.Tube2_outflow_duty > 0 and self.state.Tube2_inflow_duty == 0:
                     self.set_outflow(2, 0)
