@@ -7,7 +7,7 @@ Replication of experiment 15, which has the following parameter settings.
 - Rainfall data: 20 minutes of 0.1 my-m/s rain, followed by the first 120 minutes of rain data.
 - Initial water level: 650 mm.
 - Physical water limit (overflow level): 800 mm.
-- Duration control period: 10 min.
+- Duration control period: 10 cr@koebersmaegler.dkmin.
 - Control change interval: 1 min.
 - Control horizon: 70 min.
 - Optimization cost function: E(alpha*o + s + c), with alpha = 10 000.
@@ -30,7 +30,7 @@ from enum import Enum
 # Insert the name of the usb port, which might be different for different devices.
 # An easy way to get the port name is to use the Arduino IDE.
 # PORT = '/dev/ttyUSB0'
-PORT = '/dev/cu.usbmodem14201'
+PORT = '/dev/ttyACM0'
 
 # File to write calibration data to
 data_file = "build_data.txt"
@@ -40,9 +40,13 @@ weather_data_file = "Rainfall.txt"
 claire = driver.ClaireDevice(PORT)
 
 height_scale = 2
-time_scale = 1
+time_scale = 5
 max_water_level = 600  # TODO calibrate this number.
 duration = 10 * 60 / time_scale  # Duration in seconds
+
+max_water_level_paper = 300
+
+TAG = "EXPERIMENT:"
 
 
 class OutflowSettings(Enum):
@@ -51,11 +55,41 @@ class OutflowSettings(Enum):
     HIGH = 3
 
 
+def strategy_a10(t: float, w: float) -> OutflowSettings:
+    if t <= 114.09:
+        return OutflowSettings.HIGH
+    else:
+        if t <= 207.76:
+            if w <= 188.02:
+                return OutflowSettings.LOW
+            else:
+                return OutflowSettings.HIGH
+        else:
+            if t <= 288.26:
+                if w <= 178.37:
+                    return OutflowSettings.HIGH
+                else:
+                    if w <= 188.02:
+                        return OutflowSettings.LOW
+                    else:
+                        return OutflowSettings.HIGH
+            else:
+                if t <= 270:
+                    if w <= 188.02:
+                        return OutflowSettings.LOW
+                    else:
+                        return OutflowSettings.HIGH
+                else:
+                    return OutflowSettings.HIGH
+
+
+
+
+
 class StopwatchStates(Enum):
     READY = 1
     RUNNING = 2
     FINISHED = 3
-
 
 class Stopwatch:
     def __init__(self, start_state=StopwatchStates.READY):
@@ -99,8 +133,9 @@ def run_experiment():
     """The main experiment function. Closes the demonstrator connection when finished."""
     print("Resetting tubes to initial value.")
     # reset_tubes()
-    rainfall = [1.0] * 20  # First 20 minutes light rainfall.
-    rainfall.extend(read_weather_data())  # Then follow rain data.
+    #rainfall = [1.0] * 20  # First 20 minutes light rainfall.
+    #rainfall.extend(read_weather_data())  # Then follow rain data.
+    rainfall = read_weather_data()
 
     # Start experiment.
     experiment_loop(rainfall)
@@ -118,9 +153,12 @@ def experiment_loop(rainfall):
     rainfall_stopwatch = Stopwatch(start_state=StopwatchStates.FINISHED)
     inflow_on = False
     outflow_stopwatch = Stopwatch(start_state=StopwatchStates.FINISHED)
+    outflow_strat_stopwatch = Stopwatch(start_state=StopwatchStates.FINISHED)
     outflow_on = False
+    outflow_strat_on = False
 
     while time() < finish_time:
+        t = time() - start_time
         # Run the experiment.
 
         # Start with reading rainfall data
@@ -128,29 +166,55 @@ def experiment_loop(rainfall):
             rain_index = int((time() - start_time) * time_scale // 60)  # // is floor division
             rain_fraction = get_rain_on(rainfall[rain_index], 1)
             rainfall_reading_stopwatch.start(60 / time_scale)  # Rainfall data is every minute.
+            print(f"{TAG} {rain_index=}, {rain_fraction=}, remaining time {finish_time - time()}")
 
         # Adjust rainfall.
         if rainfall_stopwatch.is_finished():
             if inflow_on:
                 claire.set_inflow(1, 0)
+                claire.set_inflow(2, 0)
                 inflow_on = False
+                print(f"{TAG} inflow off duration {59.5 / time_scale * (1 - rain_fraction)}")
                 rainfall_stopwatch.start(59.5 / time_scale * (1 - rain_fraction))
             else:
                 claire.set_inflow(1, 100)
+                claire.set_inflow(2, 100)
                 inflow_on = True
-                print(59.5 / time_scale * rain_fraction + 0.5)
+                print(f"{TAG} inflow on duration {59.5 / time_scale * rain_fraction + 0.5}")
                 rainfall_stopwatch.start(59.5 / time_scale * rain_fraction + 0.5)
 
         # Adjust outflow.
         if outflow_stopwatch.is_finished():
+            print(f"{TAG} New outflow setting.")
+            static_outflow_setting = OutflowSettings.MEDIUM
             if outflow_on:
                 claire.set_outflow(1, 0)
                 outflow_on = False
-                outflow_stopwatch.start(60 / time_scale * (1 - get_outflow_on(OutflowSettings.MEDIUM, 1)))
+                outflow_t = 60 / time_scale * (1 - get_outflow_on(static_outflow_setting, 1))
+                outflow_stopwatch.start(outflow_t)
             else:
                 claire.set_outflow(1, 100)
                 outflow_on = True
-                outflow_stopwatch.start(60 / time_scale * get_outflow_on(OutflowSettings.MEDIUM, 1))
+                outflow_t = 60 / time_scale * get_outflow_on(static_outflow_setting, 1)
+                outflow_stopwatch.start(outflow_t)
+            print(f"{TAG} [Static] Outflow on for {outflow_t} seconds with setting {static_outflow_setting=}. {outflow_on=}")
+
+        # apply strategy on tube 2
+        if outflow_strat_stopwatch.is_finished():
+            action = strategy_a10(t, claire.state.tube2_level * (max_water_level_paper / max_water_level))
+
+
+            if outflow_strat_on:
+                claire.set_outflow(2, 0)
+                outflow_strat_on = False
+                outflow_t = 60 / time_scale * (1 - get_outflow_on(action, 1))
+                outflow_strat_stopwatch.start(outflow_t)
+            else:
+                claire.set_outflow(2, 100)
+                outflow_strat_on = True
+                outflow_t = 60 / time_scale * get_outflow_on(action, 1)
+                outflow_strat_stopwatch.start(outflow_t)
+            print(f"{TAG} [Controller] Picked strat action {action} for {outflow_t} seconds. {outflow_strat_on=}")
 
         sleep(0.1)
 

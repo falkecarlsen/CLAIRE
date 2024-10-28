@@ -13,9 +13,10 @@ TAG = "DRIVER:"
 CLAIRE_VERSION = "v0.1.16"
 CLAIRE_READY_SIGNAL = "CLAIRE-READY"
 TUBE_MAX_LEVEL = 900
-DEBUG = True
+DEBUG = False
 COMMUNICATION_TIMEOUT = 10
 UNDERFLOW_CHECK_INTERVAL = 5
+SAFE = False
 
 
 class SensorError(Exception):
@@ -445,7 +446,7 @@ class ClaireDevice:
         """
         assert tube == 1 or tube == 2
         assert 0 <= rate <= 100
-        while not self.ready():
+        while SAFE and not self.ready():
             sleep(1)
         pump = (tube - 1) * 2 + 1
         self.write(f"4 {pump} {rate};")
@@ -460,7 +461,7 @@ class ClaireDevice:
         """
         assert tube == 1 or tube == 2
         assert 0 <= rate <= 100
-        while not self.ready():
+        while SAFE and not self.ready():
             sleep(1)
         pump = tube * 2
         self.write(f"4 {pump} {rate};")
